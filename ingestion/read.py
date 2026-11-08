@@ -1,36 +1,45 @@
-import gzip 
-import os 
-"""
-permet d'interagir avec le systeme d'exploitation mac... elle permet de cousulter les fichier d'un dossier 
-creer un dossier , supp un fichier et de verifier certains chemains
-"""
+import gzip
+import os
 import os.path as pt
-"""permet de manipuler le chemains des dossier et fichiers de manière portable et independante du systeme d'exploitation"""
-from pathlib import Path
-""" 
-in:data
-out:list of rows
- """
-def ingest(path:str): 
+from utils.logger import get_logger
+
+logger = get_logger(__name__, "ingestion.log")
+
+
+def ingest(path: str) -> list[str]:
+    rows: list[str] = []
     try:
-        files=os.listdir(path) 
-        
-        """ permet de recuperer les noms des fichiers et dossiers qui se trouvent dans un dossier
-        path indique le dossier examiner"""
-        for file in files:
-            file_path=pt.join(path,file)
-            openner=gzip.open(file_path,mode='rt',encoding="utf-8") if file.endswith('.gz') else open(file_path)#operateur térnel
-            #ouvrir le fichier pour lire son contenu sous forme de texte.
-            # utiliser UTF-8 pour transformer les données du fichier en caractères lisibles.
-            with openner as f:
-                return f.readlines()
-    except Exception as e:
-        #Exception : représente une catégorie générale d'erreurs.
-        print(e)
-        return
+        # reverse=True : auth.log.4.gz (le plus ancien) en premier
+        files = sorted(os.listdir(path), reverse=True)
+    except FileNotFoundError:
+        logger.error("Dossier introuvable : %s", path)
+        return rows
+    except PermissionError:
+        logger.error("Accès refusé au dossier : %s", path)
+        return rows
 
-if __name__=="__main__":
-    data=ingest('./data')
-    if data:
-        print(data[:10])
+    if not files:
+        logger.warning("Dossier vide : %s", path)
 
+    for file in files:
+        file_path = pt.join(path, file)
+        try:
+            if file.endswith('.gz'):
+                opener = gzip.open(file_path, mode='rt', encoding='utf-8')
+            else:
+                opener = open(file_path, encoding='utf-8')
+            with opener as f:
+                lines = f.readlines()
+            rows.extend(lines)
+            logger.info("%s : %d lignes lues", file, len(lines))
+        except FileNotFoundError:
+            logger.error("Fichier introuvable : %s", file_path)
+        except PermissionError:
+            logger.error("Accès refusé : %s", file_path)
+        except gzip.BadGzipFile:
+            logger.error("Fichier gzip corrompu : %s", file_path)
+        except UnicodeDecodeError:
+            logger.error("Erreur d'encodage : %s", file_path)
+        except OSError as e:
+            logger.error("Erreur système sur %s : %s", file_path, e)
+    return rows
