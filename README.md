@@ -1,0 +1,1 @@
+le projet pipline il nous permet de lire des fichiers de logs et Détecter les tentatives de connexion réussies et échouées, identifier les adresse IP, trouver la location des IP et stoqcker les resultat dans une base de données et aussi afficher des stat dans un dashboard
